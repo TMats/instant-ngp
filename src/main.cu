@@ -21,13 +21,12 @@
 
 #include <filesystem/path.h>
 
-
-namespace fs = filesystem;
-
 using namespace args;
 using namespace ngp;
 using namespace std;
 using namespace tcnn;
+namespace fs = filesystem;
+
 
 int main(int argc, char** argv) {
 	ArgumentParser parser{
@@ -83,6 +82,20 @@ int main(int argc, char** argv) {
 		"SNAPSHOT",
 		"Optional snapshot to load upon startup.",
 		{"snapshot"},
+	};
+
+	ValueFlag<uint32_t> width_flag{
+		parser,
+		"WIDTH",
+		"Resolution width of the GUI.",
+		{"width"},
+	};
+
+	ValueFlag<uint32_t> height_flag{
+		parser,
+		"HEIGHT",
+		"Resolution height of the GUI.",
+		{"height"},
 	};
 
 	Flag version_flag{
@@ -211,7 +224,7 @@ int main(int argc, char** argv) {
 #endif
 
 		if (gui) {
-			testbed.init_window(1920, 1080);
+			testbed.init_window(width_flag ? get(width_flag) : 1920, height_flag ? get(height_flag) : 1080);
 		}
 
 		// Render/training loop

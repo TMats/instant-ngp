@@ -12,12 +12,17 @@
  *  @author Thomas Müller & Alex Evans, NVIDIA
  */
 
-#include <neural-graphics-primitives/common.h>
-#include <imgui/imgui.h>
-#include <imgui/ImGuizmo.h> // tiny :)
 #include <neural-graphics-primitives/camera_path.h>
+#include <neural-graphics-primitives/common.h>
+
+#ifdef NGP_GUI
+#include <imgui/imgui.h>
+#include <imgui/ImGuizmo.h>
+#endif
+
 #include <json/json.hpp>
 #include <fstream>
+
 
 NGP_NAMESPACE_BEGIN
 
@@ -25,17 +30,21 @@ using namespace Eigen;
 using namespace nlohmann;
 
 CameraKeyframe lerp(const CameraKeyframe& p0, const CameraKeyframe& p1, float t, float t0, float t1) {
-	t=(t-t0)/(t1-t0);
+	t = (t - t0) / (t1 - t0);
 	Eigen::Vector4f R1 = p1.R;
-	if (R1.dot(p0.R)<0.f) // take the short path
+
+	// take the short path
+	if (R1.dot(p0.R) < 0.f)  {
 		R1=-R1;
+	}
+
 	return {
 		Eigen::Quaternionf(p0.R).slerp(t, Eigen::Quaternionf(R1)).coeffs(),
-		p0.T+(p1.T-p0.T)*t,
-		p0.slice+(p1.slice-p0.slice)*t,
-		p0.scale+(p1.scale-p0.scale)*t,
-		p0.fov+(p1.fov-p0.fov)*t,
-		p0.dof+(p1.dof-p0.dof)*t,
+		p0.T + (p1.T - p0.T) * t,
+		p0.slice + (p1.slice - p0.slice) * t,
+		p0.scale + (p1.scale - p0.scale) * t,
+		p0.fov + (p1.fov - p0.fov) * t,
+		p0.dof + (p1.dof - p0.dof) * t,
 	};
 }
 
@@ -105,6 +114,10 @@ void CameraPath::save(const std::string& filepath_string) {
 
 void CameraPath::load(const std::string& filepath_string, const Eigen::Matrix<float, 3, 4> &first_xform) {
 	std::ifstream f(filepath_string);
+	if (!f) {
+		throw std::runtime_error{std::string{"Camera path \""} + filepath_string + "\" does not exist."};
+	}
+
 	json j;
 	f >> j;
 
@@ -123,6 +136,7 @@ void CameraPath::load(const std::string& filepath_string, const Eigen::Matrix<fl
 	}
 }
 
+#ifdef NGP_GUI
 int CameraPath::imgui(char path_filename_buf[128], float frame_milliseconds, Matrix<float, 3, 4> &camera, float slice_plane_z, float scale, float fov, float dof, float bounding_radius, const Eigen::Matrix<float, 3, 4> &first_xform) {
 	int n=std::max(0,int(m_keyframes.size())-1);
 	int read= 0;					// 1=smooth, 2=hard
@@ -182,8 +196,22 @@ int CameraPath::imgui(char path_filename_buf[128], float frame_milliseconds, Mat
 
 	ImGui::InputText("##PathFile", path_filename_buf, 128);
 	ImGui::SameLine();
-	if (ImGui::Button("Load"))
-		load(path_filename_buf, first_xform);
+	static std::string camera_path_load_error_string = "";
+	if (ImGui::Button("Load")) {
+		try {
+			load(path_filename_buf, first_xform);
+		} catch (std::exception& e) {
+			ImGui::OpenPopup("Camera path load error");
+			camera_path_load_error_string = std::string{"Failed to load camera path: "} + e.what();
+		}
+	}
+	if (ImGui::BeginPopupModal("Camera path load error", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+		ImGui::Text("%s", camera_path_load_error_string.c_str());
+		if (ImGui::Button("OK", ImVec2(120, 0))) {
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
 	if (!m_keyframes.empty()) {
 		ImGui::SameLine();
 		if (ImGui::Button("Save"))
@@ -315,5 +343,6 @@ bool CameraPath::imgui_viz(Matrix<float, 4, 4> &view2proj, Matrix<float, 4, 4> &
 	}
 	return changed;
 }
+#endif //NGP_GUI
 
 NGP_NAMESPACE_END
